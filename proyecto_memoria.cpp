@@ -1,6 +1,8 @@
 // Laboratorio - Proyecto Memoria
 // Integrantes: Herman Echeverría | Pablo Morales | Máx Marroquín
 
+
+
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -125,7 +127,7 @@ public:
         });
 
         if (it != blocks.end()) {
-            it->release();  
+            it->release();  // Liberar el bloque
             blocks.erase(it, blocks.end());
             std::cout << "Archivo " << fileID << " eliminado.\n";
         } else {
@@ -163,22 +165,73 @@ void testFIFOPagination() {
     MemoryManager manager(1024, 64, BEST_FIT);
     manager.loadFile("testFile1.txt", TEXT);
     manager.loadFile("testFile2.txt", TEXT);
-    manager.pageQueue.pop();  
+    manager.pageQueue.pop();  // Simulando FIFO
     assert(manager.pageQueue.size() == 1 && "FIFO Pagination failed");
 }
 
 int main() {
-    // Ejecutando 
+    // Ejecutando pruebas
     testBestFitAllocation();
     testWorstFitAllocation();
     testFIFOPagination();
     std::cout << "Todas las pruebas pasaron con éxito." << std::endl;
 
     MemoryManager manager(1024, 64, BEST_FIT);
-    manager.loadFile("textFile.txt", TEXT);  
-    manager.loadFile("imageFile.png", BINARY);  
+    manager.loadFile("textFile.txt", TEXT);  // Asegúrate de que textFile.txt exista
+    manager.loadFile("imageFile.png", BINARY);  // Asegúrate de que imageFile.png exista
 
     manager.deleteFile("textFile.txt");
     manager.overwriteFile("imageFile.png", "Nuevo contenido");
 
+    while (true) {
+        std::cout << "\n--- Menú ---\n";
+        std::cout << "1. Cargar archivo de texto\n";
+        std::cout << "2. Cargar archivo binario\n";
+        std::cout << "3. Eliminar archivo\n";
+        std::cout << "4. Sobrescribir archivo\n";
+        std::cout << "5. Salir\n";
+
+        int choice;
+        std::cout << "Elige una opción: ";
+        std::cin >> choice;
+
+        std::string fileName, content;
+
+        switch (choice) {
+            case 1:
+                std::cout << "Nombre del archivo de texto para cargar: ";
+                std::cin >> fileName;
+                manager.loadFile(fileName, TEXT);
+                break;
+
+            case 2:
+                std::cout << "Nombre del archivo binario para cargar: ";
+                std::cin >> fileName;
+                manager.loadFile(fileName, BINARY);
+                break;
+
+            case 3:
+                std::cout << "Nombre del archivo para eliminar: ";
+                std::cin >> fileName;
+                manager.deleteFile(fileName);
+                break;
+
+            case 4:
+                std::cout << "Nombre del archivo para sobrescribir: ";
+                std::cin >> fileName;
+                std::cout << "Nuevo contenido: ";
+                std::cin >> content;
+                manager.overwriteFile(fileName, content);
+                break;
+
+            case 5:
+                std::cout << "Saliendo...\n";
+                return 0;
+
+            default:
+                std::cout << "Opción no válida.\n";
+        }
+    }
+
+    return 0;
 }
