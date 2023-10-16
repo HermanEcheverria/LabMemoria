@@ -6,6 +6,10 @@
 #include <string>
 #include <algorithm>
 
+#include <vector>
+#include <string>
+#include <algorithm>
+
 class MemoryBlock {
 public:
     int startAddress;
@@ -33,7 +37,7 @@ public:
     MemoryManager(int totalSize, int pageSize) : totalSize(totalSize), pageSize(pageSize) {}
 
     void loadFile(const std::string& fileName, int fileSize) {
-        int requiredPages = (fileSize + pageSize - 1) / pageSize; 
+        int requiredPages = (fileSize + pageSize - 1) / pageSize; // Redondeo hacia arriba
         int requiredSize = requiredPages * pageSize;
 
         int startAddress = 0;
@@ -41,6 +45,7 @@ public:
             startAddress = std::max(startAddress, block.startAddress + block.size);
         }
 
+        // Verificar si hay suficiente memoria
         if (startAddress + requiredSize > totalSize) {
             std::cout << "No hay suficiente memoria para " << fileName << std::endl;
             return;
