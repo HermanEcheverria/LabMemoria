@@ -6,14 +6,12 @@
 #include <string>
 #include <algorithm>
 
-// bloque de memoria
 class MemoryBlock {
 public:
-    int startAddress;  // Dirección de inicio
-    int size;          // Tamaño
-    std::string fileID; // Identificador del archivo
+    int startAddress;
+    int size;
+    std::string fileID;
 
-    // Constructor
     MemoryBlock(int startAddress, int size, const std::string& fileID)
         : startAddress(startAddress), size(size), fileID(fileID) {}
 
@@ -26,23 +24,29 @@ public:
     }
 };
 
-// gestionar la memoria
 class MemoryManager {
 public:
-    int totalSize;  
-    int pageSize;   
+    int totalSize;
+    int pageSize;
     std::vector<MemoryBlock> blocks;
 
-    // Constructor
     MemoryManager(int totalSize, int pageSize) : totalSize(totalSize), pageSize(pageSize) {}
 
     void loadFile(const std::string& fileName, int fileSize) {
+        int requiredPages = (fileSize + pageSize - 1) / pageSize; 
+        int requiredSize = requiredPages * pageSize;
+
         int startAddress = 0;
         for (const auto& block : blocks) {
             startAddress = std::max(startAddress, block.startAddress + block.size);
         }
 
-        MemoryBlock newBlock(startAddress, fileSize, fileName);
+        if (startAddress + requiredSize > totalSize) {
+            std::cout << "No hay suficiente memoria para " << fileName << std::endl;
+            return;
+        }
+
+        MemoryBlock newBlock(startAddress, requiredSize, fileName);
         newBlock.assign();
         blocks.push_back(newBlock);
     }
@@ -59,15 +63,28 @@ public:
             std::cout << "Archivo " << fileID << " no encontrado.\n";
         }
     }
+
+    void defragment() {
+        std::cout << "Iniciando defragmentación..." << std::endl;
+        std::sort(blocks.begin(), blocks.end(), [](const MemoryBlock& a, const MemoryBlock& b) {
+            return a.startAddress < b.startAddress;
+        });
+
+        for (size_t i = 1; i < blocks.size(); ++i) {
+            if (blocks[i].startAddress < blocks[i - 1].startAddress + blocks[i - 1].size) {
+                int overlap = (blocks[i - 1].startAddress + blocks[i - 1].size) - blocks[i].startAddress;
+                blocks[i].startAddress += overlap;
+            }
+        }
+        std::cout << "Defragmentación completada." << std::endl;
+    }
 };
 
 int main() {
     MemoryManager manager(1024, 64);
-
     manager.loadFile("archivo1.txt", 200);
     manager.loadFile("imagen1.png", 300);
-
     manager.deleteFile("archivo1.txt");
-
+    manager.defragment();
     return 0;
 }
