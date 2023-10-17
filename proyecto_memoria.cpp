@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <list>
 
+// Enumeraciones para tipos de archivo y políticas de asignación
 enum FileType
 {
     TEXT,
@@ -23,6 +24,7 @@ enum AllocationPolicy
     LRU
 };
 
+// Clase que representa un bloque de memoria
 class MemoryBlock
 {
 public:
@@ -31,39 +33,52 @@ public:
     std::string fileID;
     std::string content;
 
+    // Constructor
     MemoryBlock(int startAddress, int size, const std::string &fileID, const std::string &content)
         : startAddress(startAddress), size(size), fileID(fileID), content(content) {}
 
+    // Asignar bloque
     void assign()
     {
         std::cout << "Asignando bloque para " << fileID << std::endl;
     }
 
+    // Liberar bloque
     void release()
     {
         std::cout << "Liberando bloque de " << fileID << std::endl;
     }
 };
 
+
+// Clase que gestiona la memoria
 class MemoryManager
 {
 public:
-    int totalSize;
-    int pageSize;
-    AllocationPolicy policy;
-    std::vector<MemoryBlock> blocks;
-    std::queue<MemoryBlock> pageQueue;
-    std::list<MemoryBlock> lruList;
-    std::unordered_map<std::string, std::list<MemoryBlock>::iterator> lruMap;
+    int totalSize; // Tamaño total de la memoria
+    int pageSize;  // Tamaño de página
+    AllocationPolicy policy; // Política de asignación
+    std::vector<MemoryBlock> blocks; // Bloques de memoria
+    std::queue<MemoryBlock> pageQueue; // Cola para política FIFO
+    std::list<MemoryBlock> lruList; // Lista para política LRU
+    std::unordered_map<std::string, std::list<MemoryBlock>::iterator> lruMap; // Mapa para LRU
 
+
+    // Constructor
     MemoryManager(int totalSize, int pageSize, AllocationPolicy policy)
         : totalSize(totalSize), pageSize(pageSize), policy(policy) {}
 
 
+
+    // Leer archivo de la memoria
 void readFile(const std::string& fileID) {
+
+            // Busca el archivo en los bloques de memoria
     auto it = std::find_if(blocks.begin(), blocks.end(), [&fileID](const MemoryBlock& block) {
         return block.fileID == fileID;
-    });
+    }); 
+    
+        // Si se encuentra, muestra el contenido
     if (it != blocks.end()) {
         std::cout << "Contenido del archivo " << fileID << ":\n";
         std::cout << it->content << std::endl;
@@ -72,6 +87,8 @@ void readFile(const std::string& fileID) {
     }
 }
 
+
+    // Listar todos los bloques de memoria
 void listAllBlocks() {
     std::cout << "Bloques actuales en memoria:\n";
     for(const auto& block : blocks) {
@@ -79,10 +96,13 @@ void listAllBlocks() {
     }
 }
 
+
+    // Cargar archivo en memoria
     void loadFile(const std::string &fileName, FileType fileType)
     {
-        std::ifstream file;
+        std::ifstream file; // Stream de archivo
 
+        // Abre el archivo en modo texto o binario
         if (fileType == TEXT)
         {
             file.open(fileName, std::ios::in);
@@ -91,9 +111,10 @@ void listAllBlocks() {
         {
             file.open(fileName, std::ios::in | std::ios::binary);
         }
-
+        // Si no se puede abrir el archivo, muestra un error
         if (!file)
         {
+                    // Lee el contenido del archivo en una cadena
             std::cerr << "No se puede abrir el archivo: " << fileName << std::endl;
             return;
         }
@@ -101,22 +122,30 @@ void listAllBlocks() {
         std::string content = std::string((std::istreambuf_iterator<char>(file)),
                                           std::istreambuf_iterator<char>());
         int fileSize = content.size();
+                // Calcula el número de páginas requeridas y el tamaño necesario
         int requiredPages = (fileSize + pageSize - 1) / pageSize;
         int requiredSize = requiredPages * pageSize;
 
+        // Encuentra la dirección de inicio para el bloque
         int startAddress = findStartAddress(requiredSize);
 
+        // Verifica si hay suficiente memoria
         if (startAddress + requiredSize > totalSize)
         {
             std::cout << "No hay suficiente memoria para " << fileName << std::endl;
             return;
         }
 
+
+        // Crea un nuevo bloque de memoria
         MemoryBlock newBlock(startAddress, requiredSize, fileName, content);
         newBlock.assign();
 
+
+        // Implementa la política de asignación
         if (policy == BEST_FIT)
-        {
+        {            // Encuentra el mejor ajuste y añade el bloque
+
             int bestStart = findBestFit(requiredSize);
             blocks.push_back(newBlock);
         }
@@ -161,18 +190,26 @@ void listAllBlocks() {
         accessPage(fileName);
     }
 
+// Método para acceder a una página (archivo) y actualizar la lista LRU
     void accessPage(const std::string &fileID)
-    {
+    {      // Si el archivo ya se encuentra en la lista LRU
+
         if (lruMap.find(fileID) != lruMap.end())
         {
             lruList.erase(lruMap[fileID]);
+                    // Añade el archivo al frente de la lista LRU (como el más recientemente usado)
+
             lruList.push_front(*lruMap[fileID]);
+                    // Actualiza el mapa con la nueva posición del archivo en la lista LRU
+
             lruMap[fileID] = lruList.begin();
         }
-        else
+        else  // Si el archivo no está en la lista LRU
         {
             for (const auto &block : blocks)
             {
+                            // Si se encuentra el archivo
+
                 if (block.fileID == fileID)
                 {
                     lruList.push_front(block);
@@ -183,6 +220,7 @@ void listAllBlocks() {
         }
     }
 
+// Método para dividir la memoria en bloques según el tamaño de página
     void divideAndStoreBlocks()
     {
         int numPages = totalSize / pageSize;
@@ -193,8 +231,11 @@ void listAllBlocks() {
         }
     }
 
+
+// Método para dividir la memoria en bloques según el tamaño de página
     void defragment()
     {
+            // Ordena los bloques por dirección de inicio
         std::sort(blocks.begin(), blocks.end(), [](const MemoryBlock &a, const MemoryBlock &b)
                   { return a.startAddress < b.startAddress; });
 
@@ -203,22 +244,82 @@ void listAllBlocks() {
 
         for (const auto &block : blocks)
         {
+                    // Si hay un hueco entre el bloque actual y la dirección actual
             if (block.startAddress != currentAddress)
             {
+                            // Crea un nuevo bloque vacío para llenar el hueco
                 int gapSize = block.startAddress - currentAddress;
                 MemoryBlock newGap(currentAddress, gapSize, "", "");
-                newBlocks.push_back(newGap);
-                currentAddress += gapSize;
+                newBlocks.push_back(newGap);          // Añade el bloque actual a la lista de nuevos bloques
+                currentAddress += gapSize;         // Actualiza la dirección actual
+
             }
-            newBlocks.push_back(block);
+            newBlocks.push_back(block);     // Reemplaza los bloques antiguos con los nuevos bloques defragmentados
             currentAddress += block.size;
         }
 
         blocks = newBlocks;
     }
 
+
+// Método para eliminar un bloque de memoria por su dirección de inicio
     void deleteBlock(int startAddress)
     {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            // Encuentra el bloque por su dirección de inicio y elimínalo
         auto it = std::remove_if(blocks.begin(), blocks.end(), [startAddress](const MemoryBlock &block)
                                  { return block.startAddress == startAddress; });
 
@@ -234,8 +335,11 @@ void listAllBlocks() {
         }
     }
 
+
+// Método para sobrescribir el contenido de un bloque de memoria
     void overwriteBlock(int startAddress, const std::string &newContent)
-    {
+    {    // Encuentra el bloque por su dirección de inicio
+
         auto it = std::find_if(blocks.begin(), blocks.end(), [startAddress](const MemoryBlock &block)
                                { return block.startAddress == startAddress; });
 
@@ -250,39 +354,46 @@ void listAllBlocks() {
         }
     }
 
+
+// Método para reemplazar la página más antigua (FIFO)
     void FIFOPageReplacement(const MemoryBlock &newBlock)
     {
-        MemoryBlock oldestBlock = pageQueue.front();
-        pageQueue.pop();
-        blocks[oldestBlock.startAddress / pageSize] = newBlock;
-        pageQueue.push(newBlock);
+        MemoryBlock oldestBlock = pageQueue.front();     // Obtiene el bloque más antiguo de la cola
+        pageQueue.pop();     // Reemplaza el bloque más antiguo con el nuevo bloque en el vector de bloques
+        blocks[oldestBlock.startAddress / pageSize] = newBlock;     // Añade el nuevo bloque a la cola
+        pageQueue.push(newBlock);    // Libera el bloque más antiguo
         oldestBlock.release();
     }
 
+
+// Método para reemplazar la página menos recientemente utilizada (LRU)
     void LRUPageReplacement(const MemoryBlock &newBlock)
     {
-        MemoryBlock leastRecentlyUsed = pageQueue.front();
-        pageQueue.pop();
-        blocks[leastRecentlyUsed.startAddress / pageSize] = newBlock;
-        pageQueue.push(newBlock);
-        leastRecentlyUsed.release(); // Release the least recently used block
+        MemoryBlock leastRecentlyUsed = pageQueue.front();     // Obtiene el bloque menos recientemente utilizado de la cola
+        pageQueue.pop();     // Retira el bloque menos recientemente utilizado de la cola
+        blocks[leastRecentlyUsed.startAddress / pageSize] = newBlock;    // Reemplaza el bloque menos recientemente utilizado con el nuevo bloque en el vector de bloques
+        pageQueue.push(newBlock);     // Añade el nuevo bloque a la cola
+        leastRecentlyUsed.release();   // Libera el bloque menos recientemente utilizado
+
     }
 
+// Método para reemplazar una página en la estrategia LRU
     void replacePageLRU(const std::string &newFileID)
-    {
+    {    // Verifica si el tamaño de la lista LRU es igual al tamaño de los bloques
         if (lruList.size() == blocks.size())
         {
-            MemoryBlock lastUsedPage = lruList.back();
+            MemoryBlock lastUsedPage = lruList.back();        // Obtiene la última página utilizada (menos recientemente utilizada)
             lruList.pop_back();
-            lruMap.erase(lastUsedPage.fileID);
+            lruMap.erase(lastUsedPage.fileID);         // Elimina la última página de la lista y del mapa
 
             deleteFile(lastUsedPage.fileID);
             loadFile(newFileID, TEXT); // Cambiar TEXT a BINARY según sea necesario
         }
     }
 
+// Método para encontrar la dirección de inicio según el tamaño requerido y la política
     int findStartAddress(int requiredSize)
-    {
+    {    // Utiliza la política de mejor ajuste o peor ajuste según se configure
         if (policy == BEST_FIT)
         {
             return findBestFit(requiredSize);
@@ -293,6 +404,7 @@ void listAllBlocks() {
         }
     }
 
+// Método para encontrar el mejor ajuste
     int findBestFit(int requiredSize)
     {
         int bestSize = INT_MAX;
@@ -310,6 +422,7 @@ void listAllBlocks() {
         return bestStart;
     }
 
+// Método para encontrar el peor ajuste
     int findWorstFit(int requiredSize)
     {
         int worstSize = -1;
@@ -327,6 +440,7 @@ void listAllBlocks() {
         return worstStart;
     }
 
+// Método para eliminar un archivo
 void deleteFile(const std::string &fileID)
 {
     auto it = std::remove_if(blocks.begin(), blocks.end(), [&fileID](const MemoryBlock &block)
@@ -343,7 +457,7 @@ void deleteFile(const std::string &fileID)
     }
 }
 
-
+// Método para sobrescribir un archivo
 void overwriteFile(const std::string &fileID, const std::string &newContent)
 {
     auto it = std::find_if(blocks.begin(), blocks.end(), [&fileID](const MemoryBlock &block)
@@ -360,7 +474,7 @@ void overwriteFile(const std::string &fileID, const std::string &newContent)
     }
 }
 
-
+// Método para guardar en formato .unis
     void saveToUnisFormat(const std::string &fileName)
     {
         std::ofstream outFile(fileName + ".unis");
@@ -380,6 +494,7 @@ void overwriteFile(const std::string &fileID, const std::string &newContent)
     }
 };
 
+// Funciones para pruebas unitarias
 void testBestFitAllocation()
 {
     MemoryManager manager(1024, 64, BEST_FIT);
@@ -388,54 +503,59 @@ void testBestFitAllocation()
     assert(manager.blocks[0].startAddress <= manager.blocks[1].startAddress && "Best Fit allocation failed");
 }
 
+
+// Función de prueba para verificar la implementación del algoritmo Worst Fit
 void testWorstFitAllocation()
 {
-    MemoryManager manager(1024, 64, WORST_FIT);
-    manager.loadFile("archivoTest1.txt", TEXT);
+    MemoryManager manager(1024, 64, WORST_FIT);     // Inicializa el administrador de memoria con política de Worst Fit
+    manager.loadFile("archivoTest1.txt", TEXT);    // Carga archivos de prueba
     manager.loadFile("archivoTest2.txt", TEXT);
-    assert(manager.blocks[0].startAddress <= manager.blocks[1].startAddress && "Worst Fit allocation failed");
+    assert(manager.blocks[0].startAddress <= manager.blocks[1].startAddress && "Worst Fit allocation failed");    // Verifica que la asignación se ha realizado correctamente
+
 }
 
+// Función de prueba para verificar la paginación FIFO
 void testFIFOPagination()
 {
-    MemoryManager manager(1024, 64, FIFO);
-    manager.loadFile("archivoTest1.txt", TEXT);
+    MemoryManager manager(1024, 64, FIFO);     // Inicializa el administrador de memoria con política de FIFO
+    manager.loadFile("archivoTest1.txt", TEXT);     // Carga archivos de prueba
     manager.loadFile("archivoTest2.txt", TEXT);
     manager.pageQueue.pop(); // Simulando FIFO
     assert(manager.pageQueue.size() == 1 && "FIFO Pagination failed");
 }
-
+// Función de prueba para verificar la paginación LRU
 void testLRUPagination()
 {
-    MemoryManager manager(1024, 64, LRU);
+    MemoryManager manager(1024, 64, LRU);     // Inicializa el administrador de memoria con política de LRU
     manager.loadFile("archivoTest1.txt", TEXT);
     manager.loadFile("archivoTest2.txt", TEXT);
     manager.pageQueue.pop(); // Simulando FIFO
-    assert(manager.pageQueue.size() == 1 && "LRU Pagination failed");
+    assert(manager.pageQueue.size() == 1 && "LRU Pagination failed");    // Verifica que el tamaño de la cola sea 1
+
 }
-
-
 
 
 int main()
 {
-    // Ejecutando pruebas
+    // Ejecuta todas las pruebas unitarias
     testBestFitAllocation();
     testWorstFitAllocation();
     testFIFOPagination();
     testLRUPagination();
     std::cout << "Todas las pruebas pasaron con éxito." << std::endl;
 
-    MemoryManager manager(1024, 64, BEST_FIT);
-    manager.loadFile("textFile.txt", TEXT);    // Asegúrate de que textFile.txt exista
-    manager.loadFile("imageFile.png", BINARY); // Asegúrate de que imageFile.png exista
-
+    MemoryManager manager(1024, 64, BEST_FIT);     // Inicializa el administrador de memoria con política de Best Fit
+    manager.loadFile("textFile.txt", TEXT);    //  Creado manualmente
+    manager.loadFile("imageFile.png", BINARY); // Creado manualmente
     manager.deleteFile("textFile.txt");
     manager.overwriteFile("imageFile.png", "Nuevo contenido");
 
+
+    // Bucle del menú principal
     while (true)
     {
-        std::cout << "\n--- Menú ---\n";
+                // Despliega el menú al usuario
+        std::cout << "\n--- Menú de Manejo---\n";
         std::cout << "1. Cargar archivo de texto\n";
         std::cout << "2. Cargar archivo binario\n";
         std::cout << "3. Eliminar archivo\n";
@@ -447,6 +567,7 @@ int main()
         std::cout << "9. Listar todos los bloques\n";  
         std::cout << "10. Salir\n";
 
+        // Selección de la acción del usuario
         int choice;
         std::cout << "Elige una opción: ";
         std::cin >> choice;
@@ -455,8 +576,10 @@ int main()
 
         std::string newContent;
 
+        // Manejo de la selección del usuario
         switch (choice)
         {
+            // Llamadas y ejecución de funciones en base a selección
         case 1:
             std::cout << "Nombre del archivo de texto para cargar: ";
             std::cin >> fileName;
