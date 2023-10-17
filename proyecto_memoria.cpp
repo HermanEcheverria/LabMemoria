@@ -1,3 +1,7 @@
+// Laboratorio de Sistemas Operativos: Proyecto Memoria
+// Integrantes: Herman Echeverría  |  Pablo Morales  |  Máx Marroquín
+
+
 #include <iostream>
 #include <fstream>
 #include <vector>
