@@ -59,6 +59,26 @@ public:
     MemoryManager(int totalSize, int pageSize, AllocationPolicy policy)
         : totalSize(totalSize), pageSize(pageSize), policy(policy) {}
 
+
+void readFile(const std::string& fileID) {
+    auto it = std::find_if(blocks.begin(), blocks.end(), [&fileID](const MemoryBlock& block) {
+        return block.fileID == fileID;
+    });
+    if (it != blocks.end()) {
+        std::cout << "Contenido del archivo " << fileID << ":\n";
+        std::cout << it->content << std::endl;
+    } else {
+        std::cout << "Archivo " << fileID << " no encontrado.\n";
+    }
+}
+
+void listAllBlocks() {
+    std::cout << "Bloques actuales en memoria:\n";
+    for(const auto& block : blocks) {
+        std::cout << "Archivo: " << block.fileID << ", Dirección de inicio: " << block.startAddress << ", Tamaño: " << block.size << '\n';
+    }
+}
+
     void loadFile(const std::string &fileName, FileType fileType)
     {
         std::ifstream file;
@@ -307,36 +327,39 @@ public:
         return worstStart;
     }
 
-    void deleteFile(const std::string &fileID)
-    {
-        auto it = std::remove_if(blocks.begin(), blocks.end(), [&fileID](const MemoryBlock &block)
-                                 { return block.fileID == fileID; });
+void deleteFile(const std::string &fileID)
+{
+    auto it = std::remove_if(blocks.begin(), blocks.end(), [&fileID](const MemoryBlock &block)
+                             { return block.fileID == fileID; });
 
-        if (it != blocks.end())
-        {
-            it->release(); // Liberar el bloque
-            blocks.erase(it, blocks.end());
-            std::cout << "Archivo " << fileID << " eliminado.\n";
-        }
-        else
-        {
-            std::cout << "Archivo " << fileID << " no encontrado.\n";
-        }
+    if (it != blocks.end())
+    {
+        blocks.erase(it, blocks.end());
+        std::cout << "Archivo " << fileID << " eliminado.\n";
     }
-
-    void overwriteFile(const std::string &fileID, const std::string &newContent)
+    else
     {
-        for (auto &block : blocks)
-        {
-            if (block.fileID == fileID)
-            {
-                block.content = newContent;
-                std::cout << "Archivo " << fileID << " sobrescrito.\n";
-                return;
-            }
-        }
+        std::cout << "Archivo " << fileID << " no encontrado.\n";
+    }
+}
+
+
+void overwriteFile(const std::string &fileID, const std::string &newContent)
+{
+    auto it = std::find_if(blocks.begin(), blocks.end(), [&fileID](const MemoryBlock &block)
+                            { return block.fileID == fileID; });
+
+    if (it != blocks.end())
+    {
+        it->content = newContent;
+        std::cout << "Archivo " << fileID << " sobrescrito.\n";
+    }
+    else
+    {
         std::cout << "Archivo " << fileID << " no encontrado para sobrescribir.\n";
     }
+}
+
 
     void saveToUnisFormat(const std::string &fileName)
     {
@@ -360,24 +383,24 @@ public:
 void testBestFitAllocation()
 {
     MemoryManager manager(1024, 64, BEST_FIT);
-    manager.loadFile("testFile1.txt", TEXT);
-    manager.loadFile("testFile2.txt", TEXT);
+    manager.loadFile("archivoTest1.txt", TEXT);
+    manager.loadFile("archivoTest2.txt", TEXT);
     assert(manager.blocks[0].startAddress <= manager.blocks[1].startAddress && "Best Fit allocation failed");
 }
 
 void testWorstFitAllocation()
 {
     MemoryManager manager(1024, 64, WORST_FIT);
-    manager.loadFile("testFile1.txt", TEXT);
-    manager.loadFile("testFile2.txt", TEXT);
+    manager.loadFile("archivoTest1.txt", TEXT);
+    manager.loadFile("archivoTest2.txt", TEXT);
     assert(manager.blocks[0].startAddress <= manager.blocks[1].startAddress && "Worst Fit allocation failed");
 }
 
 void testFIFOPagination()
 {
     MemoryManager manager(1024, 64, FIFO);
-    manager.loadFile("testFile1.txt", TEXT);
-    manager.loadFile("testFile2.txt", TEXT);
+    manager.loadFile("archivoTest1.txt", TEXT);
+    manager.loadFile("archivoTest2.txt", TEXT);
     manager.pageQueue.pop(); // Simulando FIFO
     assert(manager.pageQueue.size() == 1 && "FIFO Pagination failed");
 }
@@ -385,11 +408,14 @@ void testFIFOPagination()
 void testLRUPagination()
 {
     MemoryManager manager(1024, 64, LRU);
-    manager.loadFile("testFile1.txt", TEXT);
-    manager.loadFile("testFile2.txt", TEXT);
+    manager.loadFile("archivoTest1.txt", TEXT);
+    manager.loadFile("archivoTest2.txt", TEXT);
     manager.pageQueue.pop(); // Simulando FIFO
     assert(manager.pageQueue.size() == 1 && "LRU Pagination failed");
 }
+
+
+
 
 int main()
 {
@@ -417,7 +443,9 @@ int main()
         std::cout << "5. Guardar en formato .unis\n";
         std::cout << "6. Eliminar bloque\n";
         std::cout << "7. Sobreescribir bloque\n";
-        std::cout << "8. Salir\n";
+        std::cout << "8. Leer archivo\n";
+        std::cout << "9. Listar todos los bloques\n";  
+        std::cout << "10. Salir\n";
 
         int choice;
         std::cout << "Elige una opción: ";
@@ -450,10 +478,13 @@ int main()
         case 4:
             std::cout << "Nombre del archivo para sobrescribir: ";
             std::cin >> fileName;
+            std::cin.ignore(); // Limpia el buffer
             std::cout << "Nuevo contenido: ";
-            std::cin >> content;
+            std::getline(std::cin, content); // Usa getline para manejar espacios
             manager.overwriteFile(fileName, content);
             break;
+
+
 
         case 5:
             std::cout << "Nombre del archivo donde guardar en formato .unis: ";
@@ -477,12 +508,22 @@ int main()
             manager.overwriteBlock(overwriteAddress, newContent);
             break;
 
-        case 8:
-            std::cout << "Saliendo...\n";
-            return 0;
+            case 8:
+                std::cout << "Nombre del archivo para leer: ";
+                std::cin >> fileName;
+                manager.readFile(fileName);
+                break;
 
-        default:
-            std::cout << "Opción no válida.\n";
+            case 9:
+                manager.listAllBlocks();  // Llama a la función para listar todos los bloques
+                break;
+
+            case 10:
+                std::cout << "Saliendo...\n";
+                return 0;
+
+            default:
+                std::cout << "Opción no válida.\n";
         }
     }
 
