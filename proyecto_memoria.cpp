@@ -1,8 +1,3 @@
-// Laboratorio - Proyecto Memoria
-// Integrantes: Herman Echeverría | Pablo Morales | Máx Marroquín
-
-
-
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -11,6 +6,8 @@
 #include <queue>
 #include <climits>
 #include <cassert>
+#include <unordered_map>
+#include <list>
 
 enum FileType {
     TEXT,
@@ -48,6 +45,8 @@ public:
     AllocationPolicy policy;
     std::vector<MemoryBlock> blocks;
     std::queue<MemoryBlock> pageQueue;
+    std::list<MemoryBlock> lruList;
+    std::unordered_map<std::string, std::list<MemoryBlock>::iterator> lruMap;
 
     MemoryManager(int totalSize, int pageSize, AllocationPolicy policy)
         : totalSize(totalSize), pageSize(pageSize), policy(policy) {}
@@ -83,6 +82,35 @@ public:
         newBlock.assign();
         blocks.push_back(newBlock);
         pageQueue.push(newBlock);
+
+        accessPage(fileName);
+    }
+
+    void accessPage(const std::string& fileID) {
+        if (lruMap.find(fileID) != lruMap.end()) {
+            lruList.erase(lruMap[fileID]);
+            lruList.push_front(*lruMap[fileID]);
+            lruMap[fileID] = lruList.begin();
+        } else {
+            for (const auto& block : blocks) {
+                if (block.fileID == fileID) {
+                    lruList.push_front(block);
+                    lruMap[fileID] = lruList.begin();
+                    break;
+                }
+            }
+        }
+    }
+
+    void replacePageLRU(const std::string& newFileID) {
+        if (lruList.size() == blocks.size()) {
+            MemoryBlock lastUsedPage = lruList.back();
+            lruList.pop_back();
+            lruMap.erase(lastUsedPage.fileID);
+
+            deleteFile(lastUsedPage.fileID);
+            loadFile(newFileID, TEXT);  // Cambiar TEXT a BINARY según sea necesario
+        }
     }
 
     int findStartAddress(int requiredSize) {
@@ -145,6 +173,22 @@ public:
         }
         std::cout << "Archivo " << fileID << " no encontrado para sobrescribir.\n";
     }
+
+    void saveToUnisFormat(const std::string& fileName) {
+        std::ofstream outFile(fileName + ".unis");
+
+        outFile << totalSize << " " << pageSize << "\n";
+
+        for (const auto& block : blocks) {
+            outFile << block.startAddress << " "
+                    << block.size << " "
+                    << block.fileID << " "
+                    << block.content << "\n";
+        }
+
+        outFile.close();
+        std::cout << "Datos guardados en formato .unis en el archivo " << fileName << ".unis\n";
+    }
 };
 
 void testBestFitAllocation() {
@@ -189,7 +233,8 @@ int main() {
         std::cout << "2. Cargar archivo binario\n";
         std::cout << "3. Eliminar archivo\n";
         std::cout << "4. Sobrescribir archivo\n";
-        std::cout << "5. Salir\n";
+        std::cout << "5. Guardar en formato .unis\n";
+        std::cout << "6. Salir\n";
 
         int choice;
         std::cout << "Elige una opción: ";
@@ -225,6 +270,12 @@ int main() {
                 break;
 
             case 5:
+                std::cout << "Nombre del archivo donde guardar en formato .unis: ";
+                std::cin >> fileName;
+                manager.saveToUnisFormat(fileName);
+                break;
+
+            case 6:
                 std::cout << "Saliendo...\n";
                 return 0;
 
